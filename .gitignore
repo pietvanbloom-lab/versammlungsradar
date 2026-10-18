@@ -3,3 +3,6 @@ raw/
 .claude/
 __pycache__/
 .DS_Store
+.venv/
+*.egg-info/
+site/preview.html

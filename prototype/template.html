@@ -206,8 +206,8 @@ footer{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 1
     <div class="panel-b method">
       <div>
         <h3>Was hier steht</h3>
-        <p>Dieser Stand enthält eine Quelle: die öffentliche Versammlungsliste der Polizei Berlin, die nach § 8 VersFG BE zweimal täglich aktualisiert wird. Kommende Termine stammen aus dem heutigen Abruf. Den Rückblick bauen Snapshots derselben Liste aus der Wayback Machine nach.</p>
-        <p>Für jeden vergangenen Tag gilt der jüngste Snapshot, der vor diesem Tag aufgenommen wurde. Kurzfristig angezeigte Versammlungen nach diesem Snapshot fehlen deshalb, abgesagte können noch enthalten sein.</p>
+        <p>Dieser Stand enthält eine Quelle: die öffentliche Versammlungsliste der Polizei Berlin, die nach § 8 VersFG BE zweimal täglich aktualisiert wird. Der Radar ruft sie dreimal täglich ab und speichert jeden Stand. Die Zeit vor dem ersten eigenen Abruf bauen Snapshots derselben Liste aus der Wayback Machine nach.</p>
+        <p>Ein Termin zählt, wenn ein Abruf vor dem Tag ihn enthielt und kein späterer Abruf vor dem Tag ihn wieder entfernt hat. Versammlungen, die zwischen zwei Abrufen angezeigt wurden und schon stattfanden, fehlen. Im Rückblick liegen die Snapshots teils Wochen auseinander.</p>
       </div>
       <div>
         <h3>Regeln</h3>
@@ -268,7 +268,7 @@ const EV = D.E.map((r, k) => {
     von: r[5], bis: r[6], days, first: days[0], last: days[days.length - 1], plz: r[8], ort: X.ort[r[9]], bez: X.bez[r[10]],
     lat: r[11], lon: r[12], route: r[13] >= 0 ? X.txt[r[13]] : "", plzDer: !!r[14], src: { url: src[0], at: src[1], art: src[2] },
     zuerst: r[16], zuletzt: r[17], land: "BE", kreis: "Berlin", stufe: 1,
-    id: `${iso(days[0])}-berlin-${r[8] || "00000"}-${r[0]}` };
+    id: r[18] };
 });
 EV.forEach(e => { e.status = e.last >= TODAY ? "angezeigt" : "unklar"; e.hay = (e.thema + " " + e.ort + " " + e.plz + " " + e.bez + " " + e.route).toLowerCase(); });
 
@@ -310,7 +310,7 @@ function inSel(list) { const [a, b] = st.sel; return list.filter(e => e.last >= 
 /* --- Kopf --- */
 function renderStand() {
   const upcoming = EV.filter(e => e.last >= TODAY).length;
-  $("stand").innerHTML = `<span class="badge"><i></i>Stand ${fmtD(TODAY)}, 22:03</span>
+  $("stand").innerHTML = `<span class="badge"><i></i>Stand ${fmtD(TODAY)}, ${M.stand_zeit}</span>
     <span><b class="num">${EV.length.toLocaleString("de-DE")}</b> Ereignisse seit ${fmtD(0)}</span>
     <span><b class="num">${upcoming.toLocaleString("de-DE")}</b> kommend angezeigt</span>
     <span><b class="num">1</b> von 16 Ländern mit Quelle</span>`;
@@ -607,7 +607,7 @@ function renderMethod() {
   }).join("");
   $("covtable").innerHTML = `<thead><tr><th>Land</th><th>Amtlich</th><th>Quellen</th></tr></thead><tbody>${rows}</tbody>`;
   const pastGaps = M.gaps.length;
-  $("healthnote").innerHTML = `Heutiger Abruf: <span class="num">${M.current_rows.toLocaleString("de-DE")}</span> Zeilen, angemeldet bis ${fmtD(Math.round((new Date(M.current_max + "T00:00:00Z") - d0) / DAY))}. Rückblick aus <span class="num">${M.snapshots}</span> Snapshots; <span class="num">${pastGaps}</span> von 365 Tagen liegen mehr als 7 Tage hinter dem letzten Snapshot und sind im Zeitstrahl schraffiert. Der Zeitstrahl reicht bis ${fmtD(HOR)}, spätere Dauertermine sind nicht enthalten.`;
+  $("healthnote").innerHTML = `Letzter Abruf: <span class="num">${M.current_rows.toLocaleString("de-DE")}</span> Zeilen, angemeldet bis ${fmtD(Math.round((new Date(M.current_max + "T00:00:00Z") - d0) / DAY))}. Eigene Abrufe: <span class="num">${M.abrufe}</span>, Rückblick aus <span class="num">${M.snapshots}</span> Wayback-Snapshots; <span class="num">${pastGaps}</span> von 365 Tagen liegen mehr als 7 Tage hinter dem letzten Snapshot und sind im Zeitstrahl schraffiert. Der Zeitstrahl reicht bis ${fmtD(HOR)}, spätere Dauertermine sind nicht enthalten.`;
 }
 
 /* --- CSV --- */
