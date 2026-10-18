@@ -1,0 +1,85 @@
+# Abruf aller Quellen, Merge in die Monatsdateien, Seite bauen, Commit.
+# Rohabrufe gehen ins private Repo versammlungsradar-raw (Secret RAW_REPO_TOKEN: fein granulierter Token,
+# nur dieses Repo, Contents: Read and write).
+name: ingest
+
+on:
+  schedule:
+    # GitHub rechnet in UTC: 07, 13, 19 Uhr Sommerzeit, 06, 12, 18 Uhr Winterzeit
+    - cron: "0 5,11,17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rohdaten-Repo auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: pietvanbloom-lab/versammlungsradar-raw
+          token: ${{ secrets.RAW_REPO_TOKEN }}
+          path: raw-repo
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - run: pip install -e .
+
+      - name: Geodaten aus dem Cache
+        uses: actions/cache@v4
+        with:
+          path: raw
+          key: geo-v1
+
+      - run: test -f raw/plz.csv || scripts/fetch_geo.sh
+
+      - name: Abruf und Merge
+        id: ingest
+        continue-on-error: true
+        run: python -m radar ingest --source berlin --raw-repo raw-repo
+
+      - name: Seite bauen
+        if: steps.ingest.outcome == 'success'
+        run: python -m radar site
+
+      # Auch bei Fehlschlag committen: health.json hält den Fehler fest
+      - name: Daten committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data site
+          if ! git diff --cached --quiet; then
+            git commit -m "Daten: Abruf $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
+
+      - name: Rohabruf committen
+        if: steps.ingest.outcome == 'success'
+        working-directory: raw-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Rohabruf $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
+
+      - name: Fehlschlag melden
+        if: steps.ingest.outcome == 'failure'
+        run: |
+          echo "::error::Abruf oder Merge fehlgeschlagen, alter Stand bleibt online. Details in data/health.json."
+          exit 1

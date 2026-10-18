@@ -4,9 +4,9 @@
   url: https://www.berlin.de/polizei/service/versammlungsbehoerde/versammlungen-aufzuege/index.php
   stufe: 1
   format: html-tabelle
-  parser: pipeline/build.py (parse)
+  parser: radar/sources/berlin.py
   intervall: "07:00, 13:00, 19:00"
   robots: erlaubt  # geprüft 17.10.2026; Bot muss sich im User-Agent ausweisen
   rechtsgrundlage: "§ 8 VersFG BE (Veröffentlichungspflicht), Liste wird zweimal täglich aktualisiert"
   gebiet: { bundesland: BE, ags: "11000000" }
-  rueckblick: Wayback-Machine-Snapshots derselben Liste (pipeline/fetch_wayback.py)
+  rueckblick: Wayback-Machine-Snapshots derselben Liste (scripts/fetch_wayback.py, radar backfill)
