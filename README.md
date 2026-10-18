@@ -71,7 +71,7 @@ Weitere Befehle: `radar ingest --file <html> --fetched-at <ISO>` übernimmt eine
 | `ingest` | 05, 11, 17 Uhr UTC (07, 13, 19 Uhr Sommerzeit) | Abruf, Merge, Seite bauen, Commit von `data/` und `site/`, Rohabruf ins private Repo |
 | `tests` | bei Push auf Branches und bei Pull Requests | pytest und Schema-Prüfung |
 
-Der `ingest`-Workflow braucht das Repository-Secret `RAW_REPO_TOKEN`: ein fein granulierter Token mit Zugriff nur auf `versammlungsradar-raw` und dem Recht „Contents: Read and write“. Schlägt ein Abruf fehl, bleibt der alte Stand online, `data/health.json` hält den Fehler fest und der Lauf wird rot.
+Der `ingest`-Workflow braucht das Repository-Secret `RAW_REPO_SSH_KEY`: der private Teil eines Deploy Keys mit Schreibrecht, der nur im Repo `versammlungsradar-raw` hinterlegt ist (Settings → Deploy keys). Schlägt ein Abruf fehl, bleibt der alte Stand online, `data/health.json` hält den Fehler fest und der Lauf wird rot.
 
 ## Lizenzen
 

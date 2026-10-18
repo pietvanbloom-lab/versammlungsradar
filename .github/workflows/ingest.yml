@@ -1,6 +1,6 @@
 # Abruf aller Quellen, Merge in die Monatsdateien, Seite bauen, Commit.
-# Rohabrufe gehen ins private Repo versammlungsradar-raw (Secret RAW_REPO_TOKEN: fein granulierter Token,
-# nur dieses Repo, Contents: Read and write).
+# Rohabrufe gehen ins private Repo versammlungsradar-raw (Secret RAW_REPO_SSH_KEY: privater Teil eines
+# Deploy Keys mit Schreibrecht, der nur in diesem Repo hinterlegt ist).
 name: ingest
 
 on:
@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: pietvanbloom-lab/versammlungsradar-raw
-          token: ${{ secrets.RAW_REPO_TOKEN }}
+          ssh-key: ${{ secrets.RAW_REPO_SSH_KEY }}
           path: raw-repo
 
       - uses: actions/setup-python@v5
