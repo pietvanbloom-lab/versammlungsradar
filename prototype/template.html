@@ -1,0 +1,642 @@
+<title>Versammlungsradar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Kopfzeile mit Stand, Filterleiste, Zeitstrahl über volle Breite, darunter Karte | Liste, Detail als Seitenpanel. */
+:root{
+  --paper:#eef1f3; --surface:#ffffff; --ink:#16202a; --muted:#5a6773; --line:#d3dae0; --line-soft:#e4e9ed;
+  --accent:#c4501c; --accent-ink:#ffffff; --accent-soft:#f7e1d6; --past:#8794a0; --past-soft:#dfe5ea;
+  --gap:#c9d1d8; --ok:#2f7d5b; --warn:#a86b00;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0e1317; --surface:#151c22; --ink:#e4e9ee; --muted:#93a0ac; --line:#2b353e; --line-soft:#1f2830;
+  --accent:#ee7a44; --accent-ink:#1a0d06; --accent-soft:#3b2216; --past:#66737f; --past-soft:#232c34;
+  --gap:#2e3842; --ok:#5cbf91; --warn:#e0a33a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0e1317; --surface:#151c22; --ink:#e4e9ee; --muted:#93a0ac; --line:#2b353e; --line-soft:#1f2830;
+  --accent:#ee7a44; --accent-ink:#1a0d06; --accent-soft:#3b2216; --past:#66737f; --past-soft:#232c34;
+  --gap:#2e3842; --ok:#5cbf91; --warn:#e0a33a; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:20px;padding-block:18px 40px;display:grid;gap:16px}
+@media (max-width:600px){.wrap{padding-inline:16px}}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:2px}
+
+/* Kopf */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+.brand{display:flex;align-items:center;gap:14px}
+.brand svg{flex:none}
+.brand h1{font-size:clamp(26px,4vw,38px);font-weight:800;font-stretch:78%;letter-spacing:-.01em;line-height:1}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:14px}
+.stand{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.stand b{color:var(--ink);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--surface);color:var(--muted)}
+.badge i{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+
+/* Filter */
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 12px;align-items:end}
+.field{display:grid;gap:4px;min-width:0}
+.field label,.lbl{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+select,input[type=search]{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:7px 9px;min-height:36px}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chipgroup{display:grid;gap:6px}
+.chips-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px 20px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer;line-height:1.3}
+.chip .n{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.75}
+.chip:disabled{opacity:.45;cursor:not-allowed}
+.chip.dashed{border-style:dashed}
+
+/* Panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.panel-h h2{font-size:17px;font-weight:700;font-stretch:90%}
+.panel-b{padding:12px 14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seg button{border:0;background:transparent;padding:4px 10px;font-size:13px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:4px 9px;cursor:pointer;font-size:13px}
+.iconbtn:disabled{opacity:.4;cursor:default}
+
+/* Zeitstrahl */
+.tl-wrap{position:relative;overflow:hidden;touch-action:pan-y}
+#tl{display:block;width:100%;height:190px;user-select:none;cursor:crosshair}
+.tl-legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--muted);padding:0 14px 10px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+.selinfo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px}
+.selinfo b{font-weight:700}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12px;padding:4px 8px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-100%);z-index:3}
+
+/* Hauptbereich */
+.main{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:1fr}}
+#map{display:block;width:100%;height:auto;aspect-ratio:1/1;max-height:640px}
+.map-note{font-size:12.5px;color:var(--muted);padding:0 14px 12px}
+.list{display:grid;max-height:700px;overflow:auto}
+.ev{display:grid;grid-template-columns:62px minmax(0,1fr);gap:4px 12px;padding:10px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer;text-align:left;background:transparent;border-left:3px solid transparent;border-top:0;border-right:0;width:100%}
+.ev:hover{background:var(--paper)}
+.ev[aria-current="true"]{border-left-color:var(--accent);background:var(--paper)}
+.ev .when{font-family:var(--f-mono);font-size:12px;line-height:1.35;color:var(--muted)}
+.ev .when b{display:block;color:var(--ink);font-weight:500;font-size:13px}
+.ev .t{font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ev .m{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;color:var(--muted);margin-top:3px}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.st-angezeigt{border-color:var(--accent);color:var(--accent)}
+.pill.st-unklar{border-style:dashed}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.empty{padding:28px 18px;color:var(--muted);text-align:center;display:grid;gap:6px;justify-items:center}
+.empty b{color:var(--ink);font-size:16px}
+.more{margin:12px auto;display:block}
+
+/* Detail */
+.detail{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(0,0,0,.12);z-index:20;display:grid;grid-template-rows:auto 1fr;padding-top:env(safe-area-inset-top,0px)}
+.detail-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.detail-b{overflow:auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px));display:grid;gap:14px;align-content:start}
+.detail h3{font-size:20px;font-weight:700;font-stretch:88%;line-height:1.2}
+.kv{display:grid;grid-template-columns:118px minmax(0,1fr);gap:7px 12px;font-size:14px;margin:0}
+.kv dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.src{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;gap:4px;font-size:13.5px}
+.src .lv{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ok)}
+.daysgrid{display:flex;flex-wrap:wrap;gap:4px}
+.daysgrid span{font-family:var(--f-mono);font-size:11.5px;border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+.daysgrid span.f{border-color:var(--accent);color:var(--accent)}
+.note{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line-soft);padding-top:10px}
+@media (max-width:640px){
+  .detail{top:auto;left:0;width:100%;max-height:82%;border-left:0;border-top:1px solid var(--line);border-radius:12px 12px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.18)}
+}
+
+/* Methodik */
+.method{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.method h3{font-size:16px;font-stretch:92%;margin-bottom:6px}
+.method p,.method li{font-size:14px;max-width:65ch}
+.method ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.cov{width:100%;border-collapse:collapse;font-size:13px}
+.cov th,.cov td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line-soft)}
+.cov th{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.cov td.num{text-align:right}
+.tablewrap{overflow-x:auto}
+footer{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px;border-top:1px solid var(--line);padding-top:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:var(--r);font-size:14px;z-index:30}
+@media (prefers-reduced-motion:no-preference){.detail{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="var(--ink)" stroke-width="2"/><circle cx="20" cy="20" r="11" fill="none" stroke="var(--ink)" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="4" fill="none" stroke="var(--ink)" stroke-width="1.2" opacity=".5"/><path d="M20 20 L34.5 11" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/><circle cx="27.5" cy="25" r="2.6" fill="var(--accent)"/><circle cx="13" cy="14" r="2" fill="var(--ink)"/></svg>
+      <div>
+        <h1>Versammlungsradar</h1>
+        <p>Angezeigte Versammlungen in Deutschland, zwölf Monate zurück und alle angemeldeten Termine voraus.</p>
+      </div>
+    </div>
+    <div class="stand" id="stand"></div>
+  </header>
+
+  <section class="filters" aria-label="Filter">
+    <div class="field"><label for="f-land">Bundesland</label><select id="f-land"></select></div>
+    <div class="field"><label for="f-kreis">Kreis / kreisfreie Stadt</label><select id="f-kreis"></select></div>
+    <div class="field"><label for="f-bez">Bezirk / Stadtteil</label><select id="f-bez"></select></div>
+    <div class="field"><label for="f-q">Thema oder Ort suchen</label><input id="f-q" type="search" placeholder="z. B. Pariser Platz, Miete, Iran" autocomplete="off"></div>
+  </section>
+  <section class="chips-wrap" aria-label="Weitere Filter">
+    <div class="chipgroup"><span class="lbl">Kategorie</span><div class="chiprow" id="f-cat"></div></div>
+    <div class="chipgroup"><span class="lbl">Form</span><div class="chiprow" id="f-form"></div>
+      <span class="lbl" style="margin-top:6px">Status</span><div class="chiprow" id="f-status"></div></div>
+    <div class="chipgroup"><span class="lbl">Quellenstufe</span><div class="chiprow" id="f-stufe"></div></div>
+  </section>
+
+  <section class="panel" aria-labelledby="tl-h">
+    <div class="panel-h">
+      <div class="selinfo"><h2 id="tl-h">Zeitstrahl</h2><span id="selinfo"></span></div>
+      <div class="chiprow">
+        <div class="seg" role="group" aria-label="Zeitraum zoomen" id="zoom">
+          <button data-z="all">2 Jahre</button><button data-z="q">3 Monate</button><button data-z="m">4 Wochen</button><button data-z="w">Woche</button>
+        </div>
+        <button class="iconbtn" id="pan-l" aria-label="Früher">&#8592;</button>
+        <button class="iconbtn" id="pan-r" aria-label="Später">&#8594;</button>
+      </div>
+    </div>
+    <div class="tl-wrap" id="tlwrap"><svg id="tl" role="img" aria-label="Versammlungen pro Tag"></svg></div>
+    <div class="tl-legend">
+      <span><i class="sw" style="background:var(--accent)"></i>angezeigt, kommend</span>
+      <span><i class="sw" style="background:var(--past)"></i>vergangen, noch ohne Nachlauf</span>
+      <span><i class="sw" style="background:url(#) ;background:repeating-linear-gradient(135deg,var(--gap) 0 3px,transparent 3px 6px);border:1px solid var(--gap)"></i>Archivlücke: kein Snapshot in den 7 Tagen davor</span>
+      <span>Klicken wählt einen Balken, Ziehen einen Zeitraum.</span>
+    </div>
+  </section>
+
+  <div class="main">
+    <section class="panel" aria-labelledby="map-h">
+      <div class="panel-h">
+        <h2 id="map-h">Karte</h2>
+        <div class="chiprow">
+          <div class="seg" role="group" aria-label="Kartenausschnitt" id="mapmode"><button data-m="de">Deutschland</button><button data-m="be">Berlin</button></div>
+          <button class="chip" id="cov-toggle" aria-pressed="true">Abdeckung</button>
+        </div>
+      </div>
+      <svg id="map" role="img" aria-label="Karte der Versammlungsorte"></svg>
+      <p class="map-note" id="mapnote"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="list-h">
+      <div class="panel-h">
+        <h2 id="list-h">Versammlungen</h2>
+        <div class="chiprow"><span class="num" id="listcount" style="font-size:13px;color:var(--muted)"></span><button class="iconbtn" id="csv">CSV kopieren</button></div>
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+  </div>
+
+  <section class="panel" id="methodik" aria-labelledby="m-h">
+    <div class="panel-h"><h2 id="m-h">Methodik und Abdeckung</h2><span class="badge">Prototyp · Bauphase 1</span></div>
+    <div class="panel-b method">
+      <div>
+        <h3>Was hier steht</h3>
+        <p>Dieser Stand enthält eine Quelle: die öffentliche Versammlungsliste der Polizei Berlin, die nach § 8 VersFG BE zweimal täglich aktualisiert wird. Kommende Termine stammen aus dem heutigen Abruf. Den Rückblick bauen Snapshots derselben Liste aus der Wayback Machine nach.</p>
+        <p>Für jeden vergangenen Tag gilt der jüngste Snapshot, der vor diesem Tag aufgenommen wurde. Kurzfristig angezeigte Versammlungen nach diesem Snapshot fehlen deshalb, abgesagte können noch enthalten sein.</p>
+      </div>
+      <div>
+        <h3>Regeln</h3>
+        <ul>
+          <li>Alle Einträge werden gleich erfasst, ohne Bewertung von Thema oder Richtung.</li>
+          <li>Jeder Eintrag verlinkt den Abruf, aus dem er stammt, mit Quellenstufe und Abrufzeit.</li>
+          <li>Gezeigt werden Thema, Ort und Zeit. Die Berliner Liste nennt keine Anmelder, und der Radar ergänzt keine.</li>
+          <li>Kategorie und Form sind hier nach festen Stichworten aus dem Thema gesetzt. Im Betrieb übernimmt das ein Modell mit fester Liste, das nur den Titel sieht.</li>
+          <li>Orte sind auf den Mittelpunkt der Postleitzahl gesetzt und leicht gestreut, damit gleiche PLZ nicht übereinander liegen.</li>
+          <li>Wiederkehrende Termine mit gleichem Thema, Ort und Uhrzeit sind ein Ereignis mit mehreren Tagen.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Abdeckung</h3>
+        <div class="tablewrap"><table class="cov" id="covtable"></table></div>
+        <p class="note" id="healthnote"></p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Daten: Polizei Berlin, Versammlungsbehörde; Internet Archive. Angaben ohne Gewähr, maßgeblich ist die amtliche Quelle.</span>
+    <span>Ereignisdaten geplant unter CC BY 4.0, Code unter MIT.</span>
+    <span>Kartengrundlage: Ländergrenzen nach isellsoap/deutschlandGeoJSON, Bezirke nach funkeinteraktiv/Berlin-Geodaten, PLZ-Mittelpunkte nach WZB.</span>
+  </footer>
+</div>
+
+<aside class="detail" id="detail" hidden aria-labelledby="d-title">
+  <div class="detail-h"><span class="lbl">Detailkarte</span><button class="iconbtn" id="d-close">Schließen</button></div>
+  <div class="detail-b" id="d-body"></div>
+</aside>
+<div class="toast" id="toast" hidden></div>
+
+<script id="data" type="application/json">/*DATA*/</script>
+<script>
+(function(){
+"use strict";
+const D = JSON.parse(document.getElementById("data").textContent);
+const M = D.meta, CATS = D.cats, X = D.dict;
+const DAY = 864e5;
+const d0 = new Date(M.start + "T00:00:00Z");
+const TODAY = Math.round((new Date(M.today + "T00:00:00Z") - d0) / DAY);
+const HOR = Math.round((new Date(M.horizon + "T00:00:00Z") - d0) / DAY);
+const iso = i => new Date(d0.getTime() + i * DAY).toISOString().slice(0, 10);
+const dateOf = i => new Date(d0.getTime() + i * DAY);
+const WD = ["So","Mo","Di","Mi","Do","Fr","Sa"], MON = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const fmtD = i => { const d = dateOf(i); return `${String(d.getUTCDate()).padStart(2,"0")}.${String(d.getUTCMonth()+1).padStart(2,"0")}.${d.getUTCFullYear()}`; };
+const fmtShort = i => { const d = dateOf(i); return `${d.getUTCDate()}. ${MON[d.getUTCMonth()]}`; };
+const wd = i => WD[dateOf(i).getUTCDay()];
+const gapSet = new Set(M.gaps.map(g => Math.round((new Date(g + "T00:00:00Z") - d0) / DAY)));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* Ereignisse dekodieren */
+const EV = D.E.map((r, k) => {
+  const days = []; for (const [a, n] of r[7]) for (let j = 0; j < n; j++) days.push(a + j);
+  const src = X.src[r[15]];
+  return { k, h: r[0], thema: X.txt[r[1]], titel: r[2] >= 0 ? X.txt[r[2]] : X.txt[r[1]], cat: CATS[r[3]], form: X.form[r[4]],
+    von: r[5], bis: r[6], days, first: days[0], last: days[days.length - 1], plz: r[8], ort: X.ort[r[9]], bez: X.bez[r[10]],
+    lat: r[11], lon: r[12], route: r[13] >= 0 ? X.txt[r[13]] : "", plzDer: !!r[14], src: { url: src[0], at: src[1], art: src[2] },
+    zuerst: r[16], zuletzt: r[17], land: "BE", kreis: "Berlin", stufe: 1,
+    id: `${iso(days[0])}-berlin-${r[8] || "00000"}-${r[0]}` };
+});
+EV.forEach(e => { e.status = e.last >= TODAY ? "angezeigt" : "unklar"; e.hay = (e.thema + " " + e.ort + " " + e.plz + " " + e.bez + " " + e.route).toLowerCase(); });
+
+const LAND = { "DE-BW":"Baden-Württemberg","DE-BY":"Bayern","DE-BE":"Berlin","DE-BB":"Brandenburg","DE-HB":"Bremen","DE-HH":"Hamburg","DE-HE":"Hessen","DE-MV":"Mecklenburg-Vorpommern","DE-NI":"Niedersachsen","DE-NW":"Nordrhein-Westfalen","DE-RP":"Rheinland-Pfalz","DE-SL":"Saarland","DE-SN":"Sachsen","DE-ST":"Sachsen-Anhalt","DE-SH":"Schleswig-Holstein","DE-TH":"Thüringen" };
+const COVER = { "DE-BE": { amtlich: true, quellen: 1, note: "Versammlungsliste Polizei Berlin" } };
+const FORMS = ["Aufzug","Kundgebung","Mahnwache","Infostand"];
+const STATUS = [["angekündigt","angekündigt"],["angezeigt","angezeigt"],["abgesagt","verboten oder abgesagt"],["durchgeführt","durchgeführt"],["unklar","ohne Nachlauf"]];
+const STUFEN = [[1,"amtlich"],[2,"Presse"],[3,"Veranstalter"]];
+const BEZ = D.bezirke.map(b => b.n).sort((a,b)=>a.localeCompare(b,"de"));
+
+/* Zustand */
+const st = {
+  land: "", kreis: "", bez: "", q: "",
+  cats: new Set(), forms: new Set(), status: new Set(), stufen: new Set(),
+  view: [TODAY - 45, TODAY + 45], sel: [TODAY, TODAY + 6], mapmode: "be", cov: true, open: null, limit: 120
+};
+try { const s = JSON.parse(localStorage.getItem("vr-prefs") || "{}"); if (s.mapmode) st.mapmode = s.mapmode; if (typeof s.cov === "boolean") st.cov = s.cov; } catch (e) {}
+const savePrefs = () => { try { localStorage.setItem("vr-prefs", JSON.stringify({ mapmode: st.mapmode, cov: st.cov })); } catch (e) {} };
+
+const $ = id => document.getElementById(id);
+
+/* Filter ohne Zeitraum */
+function baseFilter(skip) {
+  const q = st.q.trim().toLowerCase();
+  return EV.filter(e =>
+    (!st.land || e.land === st.land.slice(3)) &&
+    (!st.kreis || e.kreis === st.kreis) &&
+    (!st.bez || e.bez === st.bez) &&
+    (skip === "cat" || !st.cats.size || st.cats.has(e.cat)) &&
+    (skip === "form" || !st.forms.size || st.forms.has(e.form)) &&
+    (skip === "stufe" || !st.stufen.size || st.stufen.has(e.stufe)) &&
+    (!q || e.hay.includes(q)));
+}
+/* Status je Tag: vergangen = ohne Nachlauf, sonst angezeigt */
+const dayStatus = d => d >= TODAY ? "angezeigt" : "unklar";
+function daysIn(e, a, b) { const out = []; for (const d of e.days) if (d >= a && d <= b && (!st.status.size || st.status.has(dayStatus(d)))) out.push(d); return out; }
+function inSel(list) { const [a, b] = st.sel; return list.filter(e => e.last >= a && e.first <= b && daysIn(e, a, b).length); }
+
+/* --- Kopf --- */
+function renderStand() {
+  const upcoming = EV.filter(e => e.last >= TODAY).length;
+  $("stand").innerHTML = `<span class="badge"><i></i>Stand ${fmtD(TODAY)}, 22:03</span>
+    <span><b class="num">${EV.length.toLocaleString("de-DE")}</b> Ereignisse seit ${fmtD(0)}</span>
+    <span><b class="num">${upcoming.toLocaleString("de-DE")}</b> kommend angezeigt</span>
+    <span><b class="num">1</b> von 16 Ländern mit Quelle</span>`;
+}
+
+/* --- Selects --- */
+function renderSelects() {
+  const cnt = {}; EV.forEach(e => cnt[e.land] = (cnt[e.land] || 0) + 1);
+  $("f-land").innerHTML = `<option value="">Alle Länder</option>` + Object.entries(LAND).sort((a,b)=>a[1].localeCompare(b[1],"de")).map(([id, n]) =>
+    `<option value="${id}" ${st.land === id ? "selected" : ""}>${n}${COVER[id] ? ` (${(cnt[id.slice(3)]||0).toLocaleString("de-DE")})` : " (noch keine Quelle)"}</option>`).join("");
+  const kreise = st.land === "DE-BE" ? ["Berlin"] : [];
+  $("f-kreis").innerHTML = `<option value="">${st.land ? (kreise.length ? "Alle" : "keine erfasst") : "erst Land wählen"}</option>` + kreise.map(k => `<option ${st.kreis === k ? "selected" : ""}>${k}</option>`).join("");
+  $("f-kreis").disabled = !kreise.length;
+  const bz = st.kreis === "Berlin" ? BEZ : [];
+  $("f-bez").innerHTML = `<option value="">${bz.length ? "Alle Bezirke" : "erst Kreis wählen"}</option>` + bz.map(b => `<option ${st.bez === b ? "selected" : ""}>${b}</option>`).join("");
+  $("f-bez").disabled = !bz.length;
+}
+
+/* --- Chips --- */
+function chipGroup(el, items, set, key, skip, extra) {
+  const pool = inSel(baseFilter(skip));
+  el.innerHTML = items.map(([v, label]) => {
+    const n = pool.filter(e => key(e, v)).length;
+    const on = set.has(v);
+    return `<button class="chip ${extra ? extra(v) : ""}" data-v="${esc(v)}" aria-pressed="${on}" ${!n && !on ? "disabled" : ""}>${esc(label)} <span class="n">${n.toLocaleString("de-DE")}</span></button>`;
+  }).join("");
+}
+function renderChips() {
+  chipGroup($("f-cat"), CATS.map(c => [c, c]), st.cats, (e, v) => e.cat === v, "cat");
+  chipGroup($("f-form"), FORMS.map(f => [f, f]), st.forms, (e, v) => e.form === v, "form");
+  // Status zählt Ereignisse mit mindestens einem Tag dieses Status im Zeitraum
+  const pool = inSel(baseFilter());
+  const [a, b] = st.sel;
+  $("f-status").innerHTML = STATUS.map(([v, label]) => {
+    const n = pool.filter(e => e.days.some(d => d >= a && d <= b && dayStatus(d) === v)).length;
+    const on = st.status.has(v);
+    return `<button class="chip ${v === "unklar" ? "dashed" : ""}" data-v="${v}" aria-pressed="${on}" ${!n && !on ? "disabled" : ""}>${label} <span class="n">${n.toLocaleString("de-DE")}</span></button>`;
+  }).join("");
+  const sp = inSel(baseFilter("stufe"));
+  $("f-stufe").innerHTML = STUFEN.map(([v, label]) => {
+    const n = sp.filter(e => e.stufe === v).length, on = st.stufen.has(v);
+    return `<button class="chip ${v === 3 ? "dashed" : ""}" data-v="${v}" aria-pressed="${on}" ${!n && !on ? "disabled" : ""} title="${n ? "" : "In diesem Stand ist noch keine Quelle dieser Stufe angebunden."}">${v} ${label} <span class="n">${n.toLocaleString("de-DE")}</span></button>`;
+  }).join("");
+}
+function bindChips(id, set, conv) {
+  $(id).addEventListener("click", ev => {
+    const b = ev.target.closest(".chip"); if (!b || b.disabled) return;
+    const v = conv ? conv(b.dataset.v) : b.dataset.v;
+    set.has(v) ? set.delete(v) : set.add(v); st.limit = 120; render();
+  });
+}
+
+/* --- Zeitstrahl --- */
+const tl = $("tl"); let tlGeom = null;
+function renderTimeline() {
+  const W = tl.clientWidth || 900, H = 190, pl = 34, pr = 10, pt = 14, pb = 34;
+  tl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const [va, vb] = st.view, span = vb - va + 1;
+  const bin = span > 200 ? 7 : 1;
+  const counts = new Map(); // Tag -> Anzahl
+  const base = baseFilter();
+  for (const e of base) for (const d of e.days) if (d >= va - 7 && d <= vb + 7 && (!st.status.size || st.status.has(dayStatus(d)))) counts.set(d, (counts.get(d) || 0) + 1);
+  // Bins ausrichten (Montag bei Wochen)
+  const bins = [];
+  let s = va;
+  if (bin === 7) { const wdn = (dateOf(va).getUTCDay() + 6) % 7; s = va - wdn; }
+  for (let a = s; a <= vb; a += bin) {
+    let n = 0, past = 0, gap = 0;
+    for (let d = a; d < a + bin; d++) { const c = counts.get(d) || 0; n += c; if (d < TODAY) past += c; if (gapSet.has(d)) gap++; }
+    bins.push({ a, b: a + bin - 1, n: bin === 7 ? n / 7 : n, raw: n, past, gap: gap / bin });
+  }
+  const max = Math.max(4, ...bins.map(b => b.n));
+  const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const m = max / p; return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; })();
+  const x = d => pl + (d - va) / span * (W - pl - pr);
+  const y = v => pt + (1 - v / nice) * (H - pt - pb);
+  const bw = Math.max(1, (W - pl - pr) / span * bin - (bin === 1 && span < 60 ? 2 : 1));
+  let g = "";
+  // Raster
+  for (let i = 0; i <= 2; i++) { const v = nice * i / 2; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line-soft)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10.5" fill="var(--muted)" font-family="var(--f-mono)">${v % 1 ? v.toFixed(1) : v}</text>`; }
+  // Lücken
+  g += `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="var(--gap)"/></pattern></defs>`;
+  for (const b of bins) if (b.gap > .5 && b.a < TODAY) g += `<rect x="${x(Math.max(b.a, va))}" y="${pt}" width="${Math.max(1, x(Math.min(b.b + 1, vb + 1)) - x(Math.max(b.a, va)))}" height="${H - pt - pb}" fill="url(#hatch)" opacity=".55"/>`;
+  // Auswahl
+  const [sa, sb] = st.sel;
+  if (sb >= va && sa <= vb) g += `<rect x="${x(Math.max(sa, va))}" y="${pt - 6}" width="${Math.max(2, x(Math.min(sb + 1, vb + 1)) - x(Math.max(sa, va)))}" height="${H - pt - pb + 6}" fill="var(--accent-soft)"/>`;
+  // Balken
+  for (const b of bins) {
+    if (!b.raw) continue;
+    const bx = x(b.a) + .5, h = y(0) - y(b.n);
+    const fut = b.a >= TODAY, mixed = !fut && b.b >= TODAY;
+    const inS = b.b >= sa && b.a <= sb;
+    const op = inS ? 1 : .55;
+    if (mixed) { const fp = (b.raw - b.past) / b.raw; g += `<rect x="${bx}" y="${y(b.n)}" width="${bw}" height="${h * fp}" fill="var(--accent)" opacity="${op}"/><rect x="${bx}" y="${y(b.n) + h * fp}" width="${bw}" height="${h * (1 - fp)}" fill="var(--past)" opacity="${op}"/>`; }
+    else g += `<rect x="${bx}" y="${y(b.n)}" width="${bw}" height="${h}" fill="${fut ? "var(--accent)" : "var(--past)"}" opacity="${op}"/>`;
+  }
+  // Achse
+  g += `<line x1="${pl}" x2="${W - pr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ink)"/>`;
+  let lastX = -99;
+  for (let d = va; d <= vb; d++) {
+    const dt = dateOf(d), day = dt.getUTCDate();
+    let label = null, strong = false;
+    if (span > 100) { if (day === 1) { label = MON[dt.getUTCMonth()] + (dt.getUTCMonth() === 0 ? " " + dt.getUTCFullYear() : ""); strong = dt.getUTCMonth() === 0; } }
+    else if (span > 20) { if (dt.getUTCDay() === 1) label = fmtShort(d); }
+    else label = `${wd(d)} ${day}.`;
+    if (label && x(d) - lastX > (span > 100 ? 40 : span > 20 ? 50 : 34)) {
+      g += `<line x1="${x(d)}" x2="${x(d)}" y1="${y(0)}" y2="${y(0) + 5}" stroke="var(--ink)"/><text x="${x(d) + 2}" y="${y(0) + 17}" font-size="10.5" fill="${strong ? "var(--ink)" : "var(--muted)"}" font-family="var(--f-mono)">${label}</text>`;
+      lastX = x(d);
+    }
+  }
+  // Heute
+  if (TODAY >= va && TODAY <= vb) g += `<line x1="${x(TODAY)}" x2="${x(TODAY)}" y1="${pt - 8}" y2="${y(0) + 24}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 2"/><text x="${x(TODAY) + 4}" y="${pt - 1}" font-size="10.5" font-weight="600" fill="var(--ink)" font-family="var(--f-mono)">heute</text>`;
+  tl.innerHTML = g;
+  tlGeom = { x, va, vb, span, pl, pr, W, bins, bin };
+  $("pan-l").disabled = va <= 0; $("pan-r").disabled = vb >= HOR;
+  document.querySelectorAll("#zoom button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.z === zoomKey())));
+}
+function zoomKey() { const s = st.view[1] - st.view[0]; return s > 500 ? "all" : s > 60 ? "q" : s > 14 ? "m" : "w"; }
+function dayAt(clientX) { const r = tl.getBoundingClientRect(); const px = (clientX - r.left) / r.width * tlGeom.W; return Math.round(tlGeom.va + (px - tlGeom.pl) / (tlGeom.W - tlGeom.pl - tlGeom.pr) * tlGeom.span - .5); }
+function binOf(d) { return tlGeom.bins.find(b => d >= b.a && d <= b.b); }
+let drag = null;
+tl.addEventListener("pointerdown", ev => { drag = { d: dayAt(ev.clientX), moved: false }; tl.setPointerCapture(ev.pointerId); });
+tl.addEventListener("pointermove", ev => {
+  const d = Math.max(0, Math.min(HOR, dayAt(ev.clientX)));
+  if (drag) { if (Math.abs(d - drag.d) >= 1) { drag.moved = true; st.sel = [Math.min(d, drag.d), Math.max(d, drag.d)]; renderTimeline(); } return; }
+  const b = binOf(d); const tip = $("tltip") || (() => { const t = document.createElement("div"); t.id = "tltip"; t.className = "tip"; $("tlwrap").appendChild(t); return t; })();
+  if (!b || d < tlGeom.va || d > tlGeom.vb) { tip.hidden = true; return; }
+  const r = tl.getBoundingClientRect();
+  tip.hidden = false; tip.style.left = (ev.clientX - r.left) + "px"; tip.style.top = "26px";
+  tip.textContent = tlGeom.bin === 7 ? `Woche ab ${fmtShort(b.a)}: ${b.raw} Versammlungstage, Ø ${b.n.toFixed(1)}/Tag` : `${wd(b.a)} ${fmtD(b.a)}: ${b.raw} Versammlungen${gapSet.has(b.a) ? " (Archivlücke)" : ""}`;
+});
+tl.addEventListener("pointerleave", () => { const t = $("tltip"); if (t) t.hidden = true; });
+tl.addEventListener("pointerup", ev => {
+  if (!drag) return;
+  if (!drag.moved) { const b = binOf(drag.d); if (b) st.sel = [Math.max(0, b.a), Math.min(HOR, b.b)]; }
+  drag = null; st.limit = 120; render();
+});
+function setZoom(z) {
+  const c = Math.round((st.sel[0] + st.sel[1]) / 2);
+  const half = { all: null, q: 45, m: 14, w: 3 }[z];
+  if (!half) st.view = [0, HOR];
+  else { let a = c - half, b = c + half + (z === "w" ? 0 : 0); if (a < 0) { b -= a; a = 0; } if (b > HOR) { a -= b - HOR; b = HOR; } st.view = [Math.max(0, a), Math.min(HOR, b)]; }
+  renderTimeline();
+}
+$("zoom").addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) setZoom(b.dataset.z); });
+function pan(dir) { const s = st.view[1] - st.view[0]; let a = st.view[0] + dir * Math.round(s * .7); a = Math.max(0, Math.min(HOR - s, a)); st.view = [a, a + s]; renderTimeline(); }
+$("pan-l").onclick = () => pan(-1); $("pan-r").onclick = () => pan(1);
+
+function renderSelInfo() {
+  const [a, b] = st.sel;
+  const label = a === b ? `${wd(a)}, ${fmtD(a)}` : `${fmtD(a)} bis ${fmtD(b)}`;
+  const presets = [["Heute", TODAY, TODAY], ["Nächste 7 Tage", TODAY, TODAY + 6], ["Letzte 30 Tage", TODAY - 30, TODAY - 1], ["Alles", 0, HOR]];
+  $("selinfo").innerHTML = `<span style="color:var(--muted)">Auswahl</span> <b class="num">${label}</b> ` +
+    presets.map(([l, x, y]) => `<button class="chip" data-a="${x}" data-b="${y}" aria-pressed="${a === x && b === y}">${l}</button>`).join(" ");
+}
+$("selinfo").addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; st.sel = [+b.dataset.a, +b.dataset.b]; st.limit = 120; render(); });
+
+/* --- Karte --- */
+const map = $("map");
+function proj(bounds, W, H, padding) {
+  const [x0, y0, x1, y1] = bounds, lat0 = (y0 + y1) / 2, kx = Math.cos(lat0 * Math.PI / 180);
+  const sx = (W - 2 * padding) / ((x1 - x0) * kx), sy = (H - 2 * padding) / (y1 - y0), s = Math.min(sx, sy);
+  const ox = (W - (x1 - x0) * kx * s) / 2, oy = (H - (y1 - y0) * s) / 2;
+  return (lon, lat) => [ox + (lon - x0) * kx * s, oy + (y1 - lat) * s];
+}
+const pathOf = (rings, P) => rings.map(r => "M" + r.map(([lo, la]) => P(lo, la).map(v => v.toFixed(1)).join(",")).join("L") + "Z").join("");
+function renderMap(list) {
+  const W = 600, H = st.mapmode === "be" ? 470 : 640;
+  map.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  map.style.aspectRatio = `${W}/${H}`;
+  document.querySelectorAll("#mapmode button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === st.mapmode)));
+  let g = `<defs><pattern id="nohatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.4" height="7" fill="var(--gap)"/></pattern></defs>`;
+  const [a, b] = st.sel;
+  if (st.mapmode === "de") {
+    const P = proj([5.8, 47.2, 15.1, 55.1], W, H, 16);
+    for (const l of D.laender) {
+      const c = COVER[l.id], selL = st.land === l.id;
+      const fill = !st.cov ? "var(--surface)" : c ? "var(--accent-soft)" : "url(#nohatch)";
+      g += `<path d="${pathOf(l.r, P)}" fill="${fill}" stroke="${selL ? "var(--ink)" : "var(--line)"}" stroke-width="${selL ? 1.6 : .8}" data-land="${l.id}" style="cursor:pointer"><title>${esc(l.n)}: ${c ? "amtliche Liste erfasst" : "noch keine Quelle erfasst"}</title></path>`;
+    }
+    // Bündel je Land
+    const byL = {}; list.forEach(e => byL[e.land] = (byL[e.land] || 0) + 1);
+    if (byL.BE) { const [cx, cy] = P(13.40, 52.52), r = 8 + Math.sqrt(byL.BE) * 1.6;
+      g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--accent)" fill-opacity=".85" stroke="var(--surface)" stroke-width="2" data-land="DE-BE" style="cursor:pointer"/><text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--accent-ink)" font-family="var(--f-mono)" pointer-events="none">${byL.BE}</text>`; }
+    $("mapnote").innerHTML = st.cov ? `Schraffiert: Land ohne erfasste Quelle. Das heißt nicht, dass dort keine Versammlungen stattfinden. Klick auf Berlin öffnet die Stadtansicht.` : `Kreis zeigt die Zahl der Versammlungen in der Auswahl. Klick auf Berlin öffnet die Stadtansicht.`;
+  } else {
+    const P = proj([13.08, 52.335, 13.77, 52.68], W, H, 14);
+    const byB = {}; list.forEach(e => byB[e.bez] = (byB[e.bez] || 0) + 1);
+    for (const bz of D.bezirke) {
+      const on = st.bez === bz.n;
+      g += `<path d="${pathOf(bz.r, P)}" fill="${on ? "var(--accent-soft)" : "var(--paper)"}" stroke="${on ? "var(--ink)" : "var(--line)"}" stroke-width="${on ? 1.6 : 1}" data-bez="${esc(bz.n)}" style="cursor:pointer"><title>${esc(bz.n)}: ${byB[bz.n] || 0} in der Auswahl</title></path>`;
+    }
+    // Bezirksnamen
+    for (const bz of D.bezirke) {
+      let sx = 0, sy = 0, n = 0; for (const r of bz.r) for (const [lo, la] of r) { sx += lo; sy += la; n++; }
+      const [cx, cy] = P(sx / n, sy / n);
+      g += `<text x="${cx}" y="${cy}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--f-mono)" pointer-events="none" letter-spacing=".04em">${esc(bz.n.split("-")[0].toUpperCase())}</text>`;
+    }
+    const pts = list.filter(e => e.lat).sort((p, q) => q.first - p.first);
+    const r = pts.length > 600 ? 2.6 : pts.length > 150 ? 3.4 : 4.6;
+    for (const e of pts) {
+      const [cx, cy] = P(e.lon, e.lat);
+      const fut = e.last >= TODAY, cur = st.open === e.k;
+      g += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${cur ? r + 3 : r}" fill="${fut ? "var(--accent)" : "var(--surface)"}" fill-opacity="${fut ? .8 : 1}" stroke="${cur ? "var(--ink)" : fut ? "var(--surface)" : "var(--past)"}" stroke-width="${cur ? 2 : 1}" ${e.stufe === 3 ? 'stroke-dasharray="2 1.5"' : ""} data-k="${e.k}" style="cursor:pointer"><title>${esc(e.titel.slice(0, 90))}</title></circle>`;
+    }
+    const noGeo = list.length - pts.length;
+    $("mapnote").innerHTML = `Punkte liegen am Mittelpunkt der Postleitzahl, nicht an der genauen Adresse. Gefüllt: kommend, hohl: vergangen.${noGeo ? ` ${noGeo} Einträge ohne zuordenbare PLZ fehlen auf der Karte.` : ""}`;
+  }
+  map.innerHTML = g;
+}
+map.addEventListener("click", ev => {
+  const t = ev.target;
+  if (t.dataset.k) { openDetail(+t.dataset.k); return; }
+  if (t.dataset.land) { st.land = t.dataset.land; st.kreis = ""; st.bez = ""; if (t.dataset.land === "DE-BE") { st.mapmode = "be"; st.kreis = "Berlin"; } savePrefs(); render(); return; }
+  if (t.dataset.bez) { st.land = "DE-BE"; st.kreis = "Berlin"; st.bez = st.bez === t.dataset.bez ? "" : t.dataset.bez; render(); }
+});
+$("mapmode").addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; st.mapmode = b.dataset.m; savePrefs(); render(); });
+$("cov-toggle").addEventListener("click", () => { st.cov = !st.cov; savePrefs(); render(); });
+
+/* --- Liste --- */
+function statusPill(s) { const l = s === "angezeigt" ? "angezeigt" : "ohne Nachlauf"; return `<span class="pill st-${s}"><span class="dot"></span>${l}</span>`; }
+function renderList(list) {
+  const [a, b] = st.sel;
+  const rows = list.map(e => ({ e, ds: daysIn(e, a, b) })).filter(r => r.ds.length)
+    .sort((p, q) => p.ds[0] - q.ds[0] || p.e.von.localeCompare(q.e.von) || p.e.titel.localeCompare(q.e.titel, "de"));
+  $("listcount").textContent = `${rows.length.toLocaleString("de-DE")} in der Auswahl`;
+  if (!rows.length) {
+    const landName = st.land ? LAND[st.land] : "";
+    $("list").innerHTML = st.land && !COVER[st.land]
+      ? `<div class="empty"><b>Für ${esc(landName)} ist noch keine Quelle erfasst.</b><span>Eine leere Liste heißt hier nicht, dass keine Versammlungen stattfinden. Amtliche Listen und Presse für weitere Länder folgen in Bauphase 2 und 3.</span></div>`
+      : `<div class="empty"><b>Keine Versammlungen für diese Filter.</b><span>Zeitraum im Zeitstrahl erweitern oder Filter zurücksetzen.</span></div>`;
+    return rows;
+  }
+  $("list").innerHTML = rows.slice(0, st.limit).map(({ e, ds }) => {
+    const d = ds[0], multi = e.days.length > 1;
+    return `<button class="ev" data-k="${e.k}" aria-current="${st.open === e.k}">
+      <span class="when"><b>${wd(d)} ${fmtShort(d)}</b>${e.von}–${e.bis}</span>
+      <span><span class="t">${esc(e.titel)}</span>
+        <span class="m"><span>${esc(e.ort)}${e.bez && e.bez !== "unbekannt" ? ", " + esc(e.bez) : ""}</span>
+        <span>${e.form}</span><span>${e.cat}</span>${multi ? `<span class="num">${e.days.length} Termine</span>` : ""}${statusPill(dayStatus(d))}</span></span>
+    </button>`;
+  }).join("") + (rows.length > st.limit ? `<button class="iconbtn more" id="more">${Math.min(120, rows.length - st.limit)} weitere zeigen (${(rows.length - st.limit).toLocaleString("de-DE")} übrig)</button>` : "");
+  return rows;
+}
+$("list").addEventListener("click", ev => {
+  if (ev.target.id === "more") { st.limit += 120; render(); return; }
+  const b = ev.target.closest(".ev"); if (b) openDetail(+b.dataset.k);
+});
+
+/* --- Detail --- */
+function openDetail(k) {
+  const e = EV[k]; st.open = k;
+  const fut = e.days.filter(d => d >= TODAY);
+  const daysHtml = e.days.length > 1
+    ? `<div class="daysgrid">${e.days.slice(0, 60).map(d => `<span class="${d >= TODAY ? "f" : ""}">${fmtShort(d)}${dateOf(d).getUTCFullYear() !== 2026 ? " " + dateOf(d).getUTCFullYear() : ""}</span>`).join("")}${e.days.length > 60 ? `<span>+${e.days.length - 60}</span>` : ""}</div>` : "";
+  const srcLabel = e.src.art === "aktuell" ? "Abruf der aktuellen Liste" : "Wayback-Snapshot der Liste";
+  $("d-body").innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${statusPill(fut.length ? "angezeigt" : "unklar")}<span class="pill">${e.form}</span><span class="pill">${e.cat}</span></div>
+    <h3 id="d-title">${esc(e.thema)}</h3>
+    <dl class="kv">
+      <dt>Wann</dt><dd>${e.days.length > 1 ? `${e.days.length} Termine, ${fmtD(e.first)} bis ${fmtD(e.last)}` : `${wd(e.first)}, ${fmtD(e.first)}`}<br><span class="num">${e.von}–${e.bis} Uhr</span></dd>
+      <dt>${e.form === "Aufzug" ? "Startpunkt" : "Ort"}</dt><dd>${esc(e.ort) || "nicht angegeben"}<br>${esc(e.plz)} Berlin${e.bez && e.bez !== "unbekannt" ? ", Bezirk " + esc(e.bez) : ""}</dd>
+      <dt>Genauigkeit</dt><dd>Mittelpunkt der Postleitzahl${e.plzDer ? ". Die Liste nennt keine PLZ; sie ist aus anderen Einträgen am selben Ort abgeleitet." : ""}${e.route && !e.lat ? "" : ""}</dd>
+      ${e.route ? `<dt>Aufzugsstrecke</dt><dd>${esc(e.route)}</dd>` : ""}
+      <dt>Veranstalter</dt><dd style="color:var(--muted)">nicht angegeben, die Liste nennt keine</dd>
+      <dt>Status</dt><dd>${fut.length ? "angezeigt bei der Versammlungsbehörde" : "Termin vorbei. Ob die Versammlung stattfand, prüft erst der Nachlauf (Bauphase 3)."}</dd>
+      <dt>Konfidenz</dt><dd class="num">0,95 · Stufe 1</dd>
+    </dl>
+    ${daysHtml}
+    <div class="src">
+      <span class="lv">Stufe 1 · amtlich</span>
+      <b>Polizei Berlin, Versammlungsbehörde</b>
+      <span>${srcLabel}, abgerufen <span class="num">${e.src.at.replace("T", " ").replace("Z", " UTC")}</span></span>
+      <a href="${esc(e.src.url)}" target="_blank" rel="noopener">Quelle öffnen</a>
+    </div>
+    <dl class="kv">
+      <dt>Zuerst gesehen</dt><dd class="num">${fmtD(e.zuerst)}</dd>
+      <dt>Zuletzt gesehen</dt><dd class="num">${fmtD(e.zuletzt)}</dd>
+      <dt>ID</dt><dd class="mono" style="font-size:12px">${e.id}</dd>
+    </dl>
+    <p class="note">Fehler gefunden oder Löschwunsch? Der Korrekturweg mit Reaktionsziel 48 Stunden geht mit dem Launch live (Bauphase 5). Im Prototyp ist er noch nicht erreichbar.</p>`;
+  $("detail").hidden = false;
+  render(true);
+  $("d-close").focus();
+}
+function closeDetail() { st.open = null; $("detail").hidden = true; render(true); }
+$("d-close").onclick = closeDetail;
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && st.open !== null) closeDetail(); });
+
+/* --- Methodik --- */
+function renderMethod() {
+  const rows = Object.entries(LAND).sort((a, b) => a[1].localeCompare(b[1], "de")).map(([id, n]) => {
+    const c = COVER[id];
+    return `<tr><td>${n}</td><td>${c ? `<span style="color:var(--ok)">amtliche Liste</span>` : `<span style="color:var(--muted)">keine</span>`}</td><td class="num">${c ? c.quellen : 0}</td></tr>`;
+  }).join("");
+  $("covtable").innerHTML = `<thead><tr><th>Land</th><th>Amtlich</th><th>Quellen</th></tr></thead><tbody>${rows}</tbody>`;
+  const pastGaps = M.gaps.length;
+  $("healthnote").innerHTML = `Heutiger Abruf: <span class="num">${M.current_rows.toLocaleString("de-DE")}</span> Zeilen, angemeldet bis ${fmtD(Math.round((new Date(M.current_max + "T00:00:00Z") - d0) / DAY))}. Rückblick aus <span class="num">${M.snapshots}</span> Snapshots; <span class="num">${pastGaps}</span> von 365 Tagen liegen mehr als 7 Tage hinter dem letzten Snapshot und sind im Zeitstrahl schraffiert. Der Zeitstrahl reicht bis ${fmtD(HOR)}, spätere Dauertermine sind nicht enthalten.`;
+}
+
+/* --- CSV --- */
+let lastRows = [];
+$("csv").addEventListener("click", async () => {
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [["id","datum_erster_termin","termine","von","bis","thema","kategorie","form","plz","ort","bezirk","bundesland","status","quelle","abgerufen"].join(",")];
+  for (const { e, ds } of lastRows) lines.push([e.id, iso(ds[0]), e.days.length, e.von, e.bis, e.thema, e.cat, e.form, e.plz, e.ort, e.bez, "BE", dayStatus(ds[0]), e.src.url, e.src.at].map(q).join(","));
+  const txt = lines.join("\n");
+  try { await navigator.clipboard.writeText(txt); toast(`${lastRows.length} Zeilen als CSV kopiert`); }
+  catch (err) { toast("Kopieren nicht erlaubt in dieser Ansicht"); }
+});
+function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
+
+/* --- Filter-Events --- */
+$("f-land").onchange = ev => { st.land = ev.target.value; st.kreis = st.land === "DE-BE" ? "Berlin" : ""; st.bez = ""; if (st.land && st.land !== "DE-BE") st.mapmode = "de"; if (st.land === "DE-BE") st.mapmode = "be"; st.limit = 120; render(); };
+$("f-kreis").onchange = ev => { st.kreis = ev.target.value; st.bez = ""; st.limit = 120; render(); };
+$("f-bez").onchange = ev => { st.bez = ev.target.value; st.limit = 120; render(); };
+let qt; $("f-q").addEventListener("input", ev => { clearTimeout(qt); qt = setTimeout(() => { st.q = ev.target.value; st.limit = 120; render(); }, 150); });
+bindChips("f-cat", st.cats); bindChips("f-form", st.forms); bindChips("f-status", st.status); bindChips("f-stufe", st.stufen, Number);
+
+/* --- Render --- */
+function render(light) {
+  const base = baseFilter(), sel = inSel(base);
+  if (!light) { renderSelects(); renderChips(); renderSelInfo(); renderTimeline(); }
+  lastRows = renderList(sel);
+  renderMap(sel);
+}
+renderStand(); renderMethod(); render();
+let rt; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(renderTimeline, 60); }).observe($("tlwrap"));
+})();
+</script>

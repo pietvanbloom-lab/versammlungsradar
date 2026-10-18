@@ -1,0 +1,5 @@
+# Rohabrufe gehören ins private Repo versammlungsradar-raw, nicht hierher
+raw/
+.claude/
+__pycache__/
+.DS_Store
