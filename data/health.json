@@ -1,10 +1,10 @@
 {
  "berlin-polizei-versammlungen": {
-  "letzter_versuch": "2026-11-07T20:42Z",
+  "letzter_versuch": "2026-11-08T11:46Z",
   "letzter_erfolg": "2026-11-07T20:42Z",
-  "fehler": null,
+  "fehler": "Abruf: HTTP Error 429: Too Many Requests",
   "zeilen": 1077,
-  "fehler_in_folge": 0,
+  "fehler_in_folge": 1,
   "ereignisse": 5632
  }
 }
