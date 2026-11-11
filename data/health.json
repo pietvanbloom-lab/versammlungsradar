@@ -1,10 +1,10 @@
 {
  "berlin-polizei-versammlungen": {
-  "letzter_versuch": "2026-11-11T12:30Z",
-  "letzter_erfolg": "2026-11-11T12:30Z",
+  "letzter_versuch": "2026-11-11T23:21Z",
+  "letzter_erfolg": "2026-11-11T23:21Z",
   "fehler": null,
-  "zeilen": 1023,
+  "zeilen": 1020,
   "fehler_in_folge": 0,
-  "ereignisse": 5676
+  "ereignisse": 5695
  }
 }
